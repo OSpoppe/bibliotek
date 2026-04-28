@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UB Bibliotek</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: #0A0E1A; font-family: 'DM Sans', sans-serif; color: #F0F4FF; }
+  ::-webkit-scrollbar { display: none; }
+  button { cursor: pointer; font-family: 'DM Sans', sans-serif; border: none; outline: none; }
+  input, select, textarea { font-family: 'DM Sans', sans-serif; outline: none; border: none; }
+  #root { height: 100%; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const C = {
+  bg: "#0A0E1A", surface: "#111827", card: "#1A2235", border: "#1E2D45",
+  accent: "#4F8EF7", accentSoft: "#1A2F55",
+  teal: "#2DD4BF", tealSoft: "#0F3330",
+  amber: "#F59E0B", amberSoft: "#2A1E08",
+  green: "#22C55E", greenSoft: "#0A2015",
+  red: "#EF4444", redSoft: "#2A0A0A",
+  text: "#F0F4FF", textSec: "#8899BB", textMuted: "#4A5C7A",
+};
+
+const rooms = [
+  { id:1, name:"Grupperom A", capacity:6, floor:2, type:"Gruppe", slots:["08:00","10:00","14:00","16:00"], booked:["10:00"] },
+  { id:2, name:"Grupperom B", capacity:4, floor:2, type:"Gruppe", slots:["08:00","09:00","11:00","13:00","15:00"], booked:["09:00","13:00"] },
+  { id:3, name:"Stillesone 1", capacity:1, floor:1, type:"Stille", slots:["08:00","10:00","12:00","14:00"], booked:[] },
+  { id:4, name:"Lab-rom", capacity:8, floor:3, type:"Lab", slots:["09:00","13:00","15:00"], booked:["09:00"] },
+  { id:5, name:"Møterom C", capacity:12, floor:2, type:"Møte", slots:["08:00","10:00","12:00","14:00","16:00"], booked:["08:00","12:00","16:00"] },
+];
+
+const equipment = [
+  { id:1, name:"Whiteboard-tusjer", icon:"✏️", available:8, total:12, unit:"sett" },
+  { id:2, name:"Stiftemaskin", icon:"📎", available:3, total:5, unit:"stk" },
+  { id:3, name:"HDMI-kabel", icon:"🔌", available:5, total:8, unit:"stk" },
+  { id:4, name:"Laptop-lader (USB-C)", icon:"⚡", available:2, total:6, unit:"stk" },
+  { id:5, name:"Post-it blokker", icon:"📝", available:15, total:20, unit:"stk" },
+  { id:6, name:"Kalkulator", icon:"🔢", available:4, total:8, unit:"stk" },
+];
+
+const feedPosts = [
+  { id:1, user:"Maja H.", study:"Informatikk", avatar:"MH", time:"2t siden", title:"«Algorithms» av CLRS", text:"Essensiell for alle i informatikk. Pensum-nivå, men verdt å ha. Spesielt kap. 4–6 er gull!", likes:24, dislikes:1, comments:3, tag:"Anbefaling" },
+  { id:2, user:"Jonas R.", study:"Jus", avatar:"JR", time:"5t siden", title:"«Norsk rettstenkning» (Eckhoff)", text:"Litt tørr, men uunngåelig for jus-studenter. Tips: les med kommentarene ved siden av.", likes:11, dislikes:2, comments:5, tag:"Anbefaling" },
+  { id:3, user:"Sara L.", study:"Psykologi", avatar:"SL", time:"I går", title:"«Thinking, Fast and Slow»", text:"Fantastisk for alle! Kahneman gjør kognitiv psykologi tilgjengelig og underholdende.", likes:41, dislikes:0, comments:12, tag:"Populær" },
+  { id:4, user:"Erik T.", study:"Økonomi", avatar:"ET", time:"2 dager siden", title:"«Nudge» - Thaler & Sunstein", text:"Perfekt om du vil forstå atferdsøkonomi. Lett å lese og veldig relevant.", likes:18, dislikes:1, comments:7, tag:"Anbefaling" },
+];
+
+const mapAreas = [
+  { id:"A1", label:"A1", x:20, y:30, w:55, h:40, status:"ledig", type:"Stille" },
+  { id:"A2", label:"A2", x:85, y:30, w:55, h:40, status:"opptatt", type:"Stille" },
+  { id:"B1", label:"B1", x:20, y:90, w:55, h:40, status:"ledig", type:"Samarbeid" },
+  { id:"B2", label:"B2", x:85, y:90, w:55, h:40, status:"ledig", type:"Samarbeid" },
+  { id:"G1", label:"Gr.A", x:155, y:30, w:70, h:40, status:"opptatt", type:"Gruppe" },
+  { id:"G2", label:"Gr.B", x:155, y:80, w:70, h:40, status:"ledig", type:"Gruppe" },
+  { id:"G3", label:"Lab", x:155, y:130, w:70, h:35, status:"ledig", type:"Lab" },
+  { id:"R1", label:"Resepsjon", x:20, y:145, w:120, h:30, status:"info", type:"Info" },
+];
+
+const statusMap = {
+  ledig:  { color: C.green,  bg: C.greenSoft,  label:"Ledig" },
+  opptatt:{ color: C.red,    bg: C.redSoft,    label:"Opptatt" },
+  info:   { color: C.accent, bg: C.accentSoft, label:"Info" },
+};
+
+function Badge({ status, small }) {
+  const s = statusMap[status] || statusMap.ledig;
+  return (
+    <span style={{ display:"inline-flex", alignItems:"center", gap:5, background:s.bg, color:s.color,
+      fontSize:small?11:12, fontWeight:500, padding:small?"2px 7px":"3px 10px", borderRadius:20 }}>
+      <span style={{ width:small?5:6, height:small?5:6, borderRadius:"50%", background:s.color, flexShrink:0 }} />
+      {s.label}
+    </span>
+  );
+}
+
+function Av({ initials }) {
+  return (
+    <div style={{ width:38, height:38, borderRadius:"50%", background:C.accentSoft,
+      border:`1.5px solid ${C.accent}33`, display:"flex", alignItems:"center", justifyContent:"center",
+      fontSize:13, fontWeight:600, color:C.accent, flexShrink:0 }}>{initials}</div>
+  );
+}
+
+function Tag({ label, active, onClick }) {
+  return (
+    <button onClick={onClick} style={{ background:active?C.accent:C.surface, color:active?"#fff":C.textSec,
+      border:`1px solid ${active?C.accent:C.border}`, borderRadius:20, padding:"5px 14px",
+      fontSize:12, fontWeight:500, whiteSpace:"nowrap" }}>{label}</button>
+  );
+}
+
+function Card({ children, style, onClick }) {
+  return (
+    <div onClick={onClick} style={{ background:C.card, border:`1px solid ${C.border}`,
+      borderRadius:16, padding:16, ...(onClick?{cursor:"pointer"}:{}), ...style }}>
+      {children}
+    </div>
+  );
+}
+
+function Sec({ children }) {
+  return <p style={{ fontSize:11, fontWeight:600, color:C.textMuted, letterSpacing:"0.8px",
+    textTransform:"uppercase", marginBottom:12 }}>{children}</p>;
+}
+
+// ── LOGIN ──────────────────────────────────────────────────────────────────────
+function LoginScreen({ onLogin }) {
+  const [loading, setLoading] = useState(false);
+  const [user, setUser] = useState("");
+  const [pass, setPass] = useState("");
+
+  const go = () => {
+    if (!user || !pass) return;
+    setLoading(true);
+    setTimeout(() => { setLoading(false); onLogin(); }, 1400);
+  };
+
+  return (
+    <div style={{ minHeight:"100vh", display:"flex", flexDirection:"column", background:C.bg }}>
+      <div style={{ flex:1, display:"flex", flexDirection:"column", justifyContent:"center", padding:"32px 24px", maxWidth:460, margin:"0 auto", width:"100%" }}>
+        <div style={{ marginBottom:36 }}>
+          <div style={{ width:64, height:64, borderRadius:18, background:C.accentSoft, border:`1px solid ${C.accent}44`,
+            display:"flex", alignItems:"center", justifyContent:"center", fontSize:28, marginBottom:20 }}>📚</div>
+          <p style={{ fontSize:26, fontWeight:600, marginBottom:6 }}>Universitetsbiblioteket</p>
+          <p style={{ fontSize:15, color:C.textSec }}>Logg inn med din skolekonto</p>
+        </div>
+
+        <div style={{ display:"flex", gap:8, marginBottom:20 }}>
+          {["Feide","SSO","Studentkort"].map(m => (
+            <button key={m} style={{ flex:1, padding:"11px 0", background:m==="Feide"?C.accentSoft:C.surface,
+              border:`1px solid ${C.border}`, borderRadius:12, fontSize:12, fontWeight:500, color:C.text }}>{m}</button>
+          ))}
+        </div>
+
+        <div style={{ display:"flex", flexDirection:"column", gap:12, marginBottom:20 }}>
+          <input value={user} onChange={e=>setUser(e.target.value)} placeholder="Brukernavn (feide-ID)"
+            style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12,
+              padding:"13px 16px", fontSize:15, color:C.text, width:"100%" }} />
+          <input value={pass} onChange={e=>setPass(e.target.value)} type="password" placeholder="Passord"
+            style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:12,
+              padding:"13px 16px", fontSize:15, color:C.text, width:"100%" }} />
+        </div>
+
+        <button onClick={go} style={{ background:C.accent, color:"#fff", borderRadius:14,
+          padding:"15px", fontSize:16, fontWeight:600, width:"100%", opacity:loading?0.7:1 }}>
+          {loading ? "Logger inn…" : "Logg inn via Feide"}
+        </button>
+
+        <p style={{ fontSize:12, color:C.textMuted, textAlign:"center", marginTop:16 }}>
+          Sikker innlogging via Feide/NIRD · SSL-kryptert
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// ── HOME ───────────────────────────────────────────────────────────────────────
+function HomeScreen({ setTab }) {
+  const h = new Date().getHours();
+  const gr = h < 12 ? "God morgen" : h < 17 ? "God dag" : "God kveld";
+  return (
+    <div style={{ padding:"0 16px 16px" }}>
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:24 }}>
+        <div>
+          <p style={{ fontSize:22, fontWeight:600, marginBottom:4 }}>{gr}, Amira 👋</p>
+          <p style={{ fontSize:13, color:C.textSec }}>Informatikk, 3. år</p>
+        </div>
+        <Av initials="AK" />
+      </div>
+
+      <Card style={{ marginBottom:20, background:`linear-gradient(135deg,${C.accentSoft} 0%,#0d1f3d 100%)`, border:`1px solid ${C.accent}44` }}>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:12 }}>
+          <p style={{ fontSize:13, color:C.textSec, fontWeight:500 }}>Digital adgang</p>
+          <Badge status="ledig" />
+        </div>
+        <p style={{ fontSize:13, color:C.textSec, marginBottom:14 }}>Biblioteket er åpent. Trykk for å låse opp med studentkortet ditt.</p>
+        <button onClick={()=>setTab("access")} style={{ background:C.accent, color:"#fff", borderRadius:10,
+          padding:"10px 20px", fontSize:13, fontWeight:600, width:"100%" }}>Åpne digital nøkkel</button>
+      </Card>
+
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:20 }}>
+        {[
+          { label:"Ledige plasser", value:"23", icon:"🪑", color:C.green },
+          { label:"Ledige grupperom", value:"3/5", icon:"🚪", color:C.teal },
+          { label:"Mine bookinger", value:"2", icon:"📅", color:C.accent },
+          { label:"Utstyr til henting", value:"0", icon:"📦", color:C.amber },
+        ].map(s=>(
+          <Card key={s.label} style={{ padding:14 }}>
+            <p style={{ fontSize:20, marginBottom:6 }}>{s.icon}</p>
+            <p style={{ fontSize:22, fontWeight:600, color:s.color, marginBottom:2 }}>{s.value}</p>
+            <p style={{ fontSize:11, color:C.textMuted }}>{s.label}</p>
+          </Card>
+        ))}
+      </div>
+
+      <Sec>Mine bookinger i dag</Sec>
+      {[
+        { room:"Grupperom A", time:"14:00 – 16:00", floor:"2. etg", status:"ledig" },
+        { room:"Sitteplass A1", time:"10:00 – 12:00", floor:"1. etg (Stille)", status:"opptatt" },
+      ].map(b=>(
+        <Card key={b.room} style={{ marginBottom:10, padding:14 }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <div>
+              <p style={{ fontWeight:500, marginBottom:3 }}>{b.room}</p>
+              <p style={{ fontSize:12, color:C.textSec }}>{b.time} · {b.floor}</p>
+            </div>
+            <Badge status={b.status} small />
+          </div>
+        </Card>
+      ))}
+
+      <div style={{ height:12 }} />
+      <Sec>Snarveier</Sec>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8 }}>
+        {[
+          { label:"Book rom", icon:"🚪", tab:"booking" },
+          { label:"Se kart", icon:"🗺️", tab:"map" },
+          { label:"Tilbakemelding", icon:"💬", tab:"feedback" },
+        ].map(s=>(
+          <button key={s.label} onClick={()=>setTab(s.tab)} style={{ background:C.surface, border:`1px solid ${C.border}`,
+            borderRadius:14, padding:"14px 8px", display:"flex", flexDirection:"column", alignItems:"center", gap:6 }}>
+            <span style={{ fontSize:22 }}>{s.icon}</span>
+            <span style={{ fontSize:11, color:C.textSec }}>{s.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── ACCESS ─────────────────────────────────────────────────────────────────────
+function AccessScreen() {
+  const [unlocked, setUnlocked] = useState(false);
+  const [scanning, setScanning] = useState(false);
+
+  const doUnlock = () => {
+    setScanning(true);
+    setTimeout(()=>{ setScanning(false); setUnlocked(true); }, 1800);
+    setTimeout(()=>setUnlocked(false), 7000);
+  };
+
+  return (
+    <div style={{ padding:"0 16px 16px" }}>
+      <p style={{ fontSize:20, fontWeight:600, marginBottom:6 }}>Digital Adgang</p>
+      <p style={{ fontSize:13, color:C.textSec, marginBottom:24 }}>Bruk studentkortet ditt til å låse opp biblioteket</p>
+
+      <Card style={{ textAlign:"center", padding:"32px 24px", marginBottom:20 }}>
+        <div style={{ width:100, height:100, borderRadius:"50%", margin:"0 auto 20px",
+          background:unlocked?C.greenSoft:scanning?C.amberSoft:C.surface,
+          border:`3px solid ${unlocked?C.green:scanning?C.amber:C.border}`,
+          display:"flex", alignItems:"center", justifyContent:"center",
+          fontSize:36, transition:"all 0.4s" }}>
+          {unlocked?"🔓":scanning?"📡":"🔒"}
+        </div>
+        <p style={{ fontWeight:600, fontSize:18, marginBottom:6 }}>
+          {unlocked?"Tilgang gitt!":scanning?"Skanner…":"Biblioteket"}
+        </p>
+        <p style={{ fontSize:13, color:C.textSec, marginBottom:20 }}>
+          {unlocked?"Dørene åpner seg nå. Velkommen inn!":scanning?"Verifiserer studentkort…":"Åpent · man–fre 08–22, lør–søn 10–18"}
+        </p>
+        <div style={{ display:"inline-flex", alignItems:"center", gap:8, marginBottom:24,
+          background:unlocked?C.greenSoft:C.surface, border:`1px solid ${unlocked?C.green:C.border}`,
+          borderRadius:12, padding:"8px 16px" }}>
+          <span style={{ width:8, height:8, borderRadius:"50%", background:unlocked?C.green:C.amber }} />
+          <span style={{ fontSize:13, fontWeight:500, color:unlocked?C.green:C.amber }}>
+            {unlocked?"TILGANG AKTIV":"KLAR TIL BRUK"}
+          </span>
+        </div>
+        <button onClick={doUnlock} disabled={scanning||unlocked} style={{ background:unlocked?C.greenSoft:C.accent,
+          border:`1px solid ${unlocked?C.green:"transparent"}`, color:unlocked?C.green:"#fff",
+          borderRadius:14, padding:"15px", fontSize:16, fontWeight:600, width:"100%",
+          opacity:scanning?0.6:1 }}>
+          {unlocked?"Tilgang aktiv":scanning?"Verifiserer…":"Lås opp med studentkort"}
+        </button>
+      </Card>
+
+      <Sec>Adgangslogg</Sec>
+      {[
+        { event:"Inngang", time:"I dag 09:14", door:"Hovedinngang" },
+        { event:"Utgang",  time:"I dag 13:52", door:"Sideinngang" },
+        { event:"Inngang", time:"Mandag 10:02", door:"Hovedinngang" },
+      ].map((l,i)=>(
+        <Card key={i} style={{ marginBottom:8, padding:13 }}>
+          <div style={{ display:"flex", justifyContent:"space-between" }}>
+            <div>
+              <p style={{ fontSize:14, fontWeight:500 }}>{l.event} · {l.door}</p>
+              <p style={{ fontSize:12, color:C.textMuted }}>{l.time}</p>
+            </div>
+            <span style={{ fontSize:18 }}>✅</span>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ── BOOKING ────────────────────────────────────────────────────────────────────
+function BookingScreen() {
+  const [fType, setFType] = useState("Alle");
+  const [fCap, setFCap] = useState(0);
+  const [sel, setSel] = useState(null);
+  const [slot, setSlot] = useState(null);
+  const [done, setDone] = useState(false);
+
+  const types = ["Alle","Gruppe","Stille","Lab","Møte"];
+  const filtered = rooms.filter(r =>
+    (fType==="Alle" || r.type===fType) && (fCap===0 || r.capacity>=fCap)
+  );
+
+  if (done) return (
+    <div style={{ padding:"40px 16px", textAlign:"center" }}>
+      <div style={{ fontSize:60, marginBottom:16 }}>🎉</div>
+      <p style={{ fontSize:22, fontWeight:600, marginBottom:8 }}>Booket!</p>
+      <p style={{ fontSize:15, color:C.textSec, marginBottom:24 }}>{sel?.name} · kl. {slot}</p>
+      <Card style={{ textAlign:"left", marginBottom:24 }}>
+        {[["Rom",sel?.name],["Etasje",`${sel?.floor}. etg`],["Tidspunkt",slot],["Dato","I dag"]].map(([k,v])=>(
+          <div key={k} style={{ display:"flex", justifyContent:"space-between", padding:"8px 0", borderBottom:`1px solid ${C.border}` }}>
+            <span style={{ fontSize:13, color:C.textSec }}>{k}</span>
+            <span style={{ fontSize:13, fontWeight:500 }}>{v}</span>
+          </div>
+        ))}
+      </Card>
+      <button onClick={()=>{setDone(false);setSel(null);setSlot(null);}} style={{
+        background:C.accent, color:"#fff", borderRadius:14, padding:"14px", fontSize:15, fontWeight:600, width:"100%" }}>
+        Book et nytt rom
+      </button>
+    </div>
+  );
+
+  if (sel) return (
+    <div style={{ padding:"0 16px 16px" }}>
+      <button onClick={()=>setSel(null)} style={{ background:"none", color:C.textSec, fontSize:14, marginBottom:20, padding:0 }}>← Tilbake</button>
+      <p style={{ fontSize:20, fontWeight:600, marginBottom:4 }}>{sel.name}</p>
+      <p style={{ fontSize:13, color:C.textSec, marginBottom:20 }}>{sel.type} · {sel.floor}. etg · Maks {sel.capacity} pers.</p>
+      <Sec>Velg tidspunkt</Sec>
+      <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:8, marginBottom:24 }}>
+        {sel.slots.map(s => {
+          const busy = sel.booked.includes(s);
+          const active = slot===s;
+          return (
+            <button key={s} disabled={busy} onClick={()=>setSlot(s)} style={{
+              background:active?C.accent:busy?C.surface:C.card,
+              border:`1px solid ${active?C.accent:C.border}`,
+              borderRadius:12, padding:"12px 0", fontSize:14, fontWeight:500,
+              color:busy?C.textMuted:active?"#fff":C.text,
+              textDecoration:busy?"line-through":"none" }}>{s}</button>
+          );
+        })}
+      </div>
+      <button disabled={!slot} onClick={()=>setDone(true)} style={{
+        background:slot?C.accent:C.surface, color:slot?"#fff":C.textMuted,
+        border:`1px solid ${slot?"transparent":C.border}`,
+        borderRadius:14, padding:"15px", fontSize:16, fontWeight:600, width:"100%" }}>
+        Bekreft booking
+      </button>
+    </div>
+  );
+
+  return (
+    <div style={{ padding:"0 16px 16px" }}>
+      <p style={{ fontSize:20, fontWeight:600, marginBottom:6 }}>Booking</p>
+      <p style={{ fontSize:13, color:C.textSec, marginBottom:16 }}>Finn og reserver rom og plasser</p>
+
+      <div style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:4, marginBottom:12 }}>
+        {types.map(t => <Tag key={t} label={t} active={fType===t} onClick={()=>setFType(t)} />)}
+      </div>
+      <div style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:4, marginBottom:20 }}>
+        {[0,2,4,6].map(n => <Tag key={n} label={n===0?"Alle størrelser":`${n}+ pers`} active={fCap===n} onClick={()=>setFCap(n)} />)}
+      </div>
+
+      {filtered.map(r => {
+        const free = r.slots.length - r.booked.length;
+        return (
+          <Card key={r.id} style={{ marginBottom:12 }} onClick={()=>setSel(r)}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+              <div style={{ flex:1 }}>
+                <div style={{ display:"flex", alignItems:"center", gap:8, marginBottom:6 }}>
+                  <p style={{ fontWeight:600, fontSize:15 }}>{r.name}</p>
+                  <Badge status={free>0?"ledig":"opptatt"} small />
+                </div>
+                <p style={{ fontSize:12, color:C.textSec }}>{r.type} · {r.floor}. etg · maks {r.capacity} pers.</p>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                <p style={{ fontSize:18, fontWeight:600, color:free>0?C.green:C.red }}>{free}</p>
+                <p style={{ fontSize:10, color:C.textMuted }}>ledige tider</p>
+              </div>
+            </div>
+          </Card>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── MAP ────────────────────────────────────────────────────────────────────────
+function MapScreen() {
+  const [hov, setHov] = useState(null);
+  const [floor, setFloor] = useState(1);
+  const scColor = { ledig:C.green, opptatt:C.red, info:C.accent };
+  const scBg    = { ledig:C.greenSoft, opptatt:C.redSoft, info:C.accentSoft };
+  const ledige  = mapAreas.filter(a=>a.status==="ledig").length;
+  const opptatt = mapAreas.filter(a=>a.status==="opptatt").length;
+
+  return (
+    <div style={{ padding:"0 16px 16px" }}>
+      <p style={{ fontSize:20, fontWeight:600, marginBottom:6 }}>Biblioteksoversikt</p>
+      <p style={{ fontSize:13, color:C.textSec, marginBottom:16 }}>Sanntidsstatus for alle soner</p>
+
+      <div style={{ display:"flex", gap:8, marginBottom:16 }}>
+        {[1,2,3].map(f=>(
+          <button key={f} onClick={()=>setFloor(f)} style={{ background:floor===f?C.accent:C.surface,
+            border:`1px solid ${floor===f?C.accent:C.border}`, borderRadius:10,
+            padding:"7px 18px", fontSize:13, fontWeight:500, color:floor===f?"#fff":C.textSec }}>
+            {f}. etg
+          </button>
+        ))}
+      </div>
+
+      <Card style={{ padding:0, overflow:"hidden", marginBottom:16 }}>
+        <div style={{ background:"#0d1522", borderRadius:14, padding:16 }}>
+          <svg viewBox="0 0 260 190" style={{ width:"100%", height:"auto", display:"block" }}>
+            <rect x="10" y="20" width="240" height="155" rx="8" fill="#111827" stroke={C.border} strokeWidth="1.5"/>
+            <rect x="145" y="20" width="2" height="155" fill={C.border}/>
+            <rect x="10" y="75" width="135" height="2" fill={C.border}/>
+            {mapAreas.map(area=>(
+              <g key={area.id} onMouseEnter={()=>setHov(area.id)} onMouseLeave={()=>setHov(null)} style={{cursor:"pointer"}}>
+                <rect x={area.x} y={area.y} width={area.w} height={area.h} rx="5"
+                  fill={hov===area.id ? scColor[area.status]+"33" : scBg[area.status]}
+                  stroke={scColor[area.status]} strokeWidth={hov===area.id?1.5:0.8}/>
+                <text x={area.x+area.w/2} y={area.y+area.h/2-5} textAnchor="middle"
+                  fill={scColor[area.status]} fontSize="9" fontWeight="600">{area.label}</text>
+                <text x={area.x+area.w/2} y={area.y+area.h/2+7} textAnchor="middle"
+                  fill={scColor[area.status]+"BB"} fontSize="7">{area.type}</text>
+              </g>
+            ))}
+            <circle cx="22" cy="183" r="4" fill={C.green}/>
+            <text x="29" y="186" fill={C.textMuted} fontSize="8">Ledig</text>
+            <circle cx="65" cy="183" r="4" fill={C.red}/>
+            <text x="72" y="186" fill={C.textMuted} fontSize="8">Opptatt</text>
+            <circle cx="108" cy="183" r="4" fill={C.accent}/>
+            <text x="115" y="186" fill={C.textMuted} fontSize="8">Info</text>
+          </svg>
+        </div>
+      </Card>
+
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:10, marginBottom:20 }}>
+        <Card style={{ textAlign:"center", padding:14 }}>
+          <p style={{ fontSize:28, fontWeight:700, color:C.green }}>{ledige}</p>
+          <p style={{ fontSize:11, color:C.textMuted }}>Ledige soner</p>
+        </Card>
+        <Card style={{ textAlign:"center", padding:14 }}>
+          <p style={{ fontSize:28, fontWeight:700, color:C.red }}>{opptatt}</p>
+          <p style={{ fontSize:11, color:C.textMuted }}>Opptatte soner</p>
+        </Card>
+      </div>
+
+      <Sec>Soneforklaring</Sec>
+      {[
+        { type:"Stille sone",      desc:"Ingen lyd. Solo-arbeid.",     icon:"🤫" },
+        { type:"Samarbeidssone",   desc:"Lavt samtalenivå OK.",         icon:"🤝" },
+        { type:"Grupperom",        desc:"Bookbart. Opp til 12 pers.",   icon:"🚪" },
+        { type:"Lab",              desc:"Datamaskiner og utstyr.",      icon:"🖥️" },
+      ].map(z=>(
+        <div key={z.type} style={{ display:"flex", gap:12, alignItems:"center", padding:"10px 0", borderBottom:`1px solid ${C.border}` }}>
+          <span style={{ fontSize:20, width:32 }}>{z.icon}</span>
+          <div>
+            <p style={{ fontSize:13, fontWeight:500 }}>{z.type}</p>
+            <p style={{ fontSize:12, color:C.textMuted }}>{z.desc}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── EQUIPMENT ──────────────────────────────────────────────────────────────────
+function EquipmentScreen() {
+  const [res, setRes] = useState({});
+  const toggle = id => setRes(r=>({...r,[id]:!r[id]}));
+
+  return (
+    <div style={{ padding:"0 16px 16px" }}>
+      <p style={{ fontSize:20, fontWeight:600, marginBottom:6 }}>Utstyrslån</p>
+      <p style={{ fontSize:13, color:C.textSec, marginBottom:20 }}>Reserver utstyr – hentes i skranken (1. etg)</p>
+
+      <Card style={{ marginBottom:20, background:C.amberSoft, border:`1px solid ${C.amber}33` }}>
+        <p style={{ fontSize:12, color:C.amber, fontWeight:500 }}>📦 Hentepunkt: Skranke A, 1. etasje</p>
+        <p style={{ fontSize:12, color:C.textSec, marginTop:4 }}>Reservert utstyr venter i 30 minutter. Ta med studentkort.</p>
+      </Card>
+
+      <Sec>Tilgjengelig utstyr</Sec>
+      {equipment.map(e=>(
+        <Card key={e.id} style={{ marginBottom:10 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+            <span style={{ fontSize:24, width:36, textAlign:"center" }}>{e.icon}</span>
+            <div style={{ flex:1 }}>
+              <p style={{ fontWeight:500, marginBottom:4 }}>{e.name}</p>
+              <div style={{ display:"flex", alignItems:"center", gap:8 }}>
+                <div style={{ flex:1, height:4, background:C.border, borderRadius:2, overflow:"hidden" }}>
+                  <div style={{ height:"100%", width:`${(e.available/e.total)*100}%`,
+                    background:e.available>0?C.green:C.red, borderRadius:2 }}/>
+                </div>
+                <p style={{ fontSize:11, color:C.textSec, whiteSpace:"nowrap" }}>{e.available}/{e.total} {e.unit}</p>
+              </div>
+            </div>
+            <button onClick={()=>toggle(e.id)} disabled={e.available===0 && !res[e.id]} style={{
+              background:res[e.id]?C.tealSoft:e.available>0?C.accent:C.surface,
+              border:`1px solid ${res[e.id]?C.teal:e.available>0?"transparent":C.border}`,
+              color:res[e.id]?C.teal:e.available>0?"#fff":C.textMuted,
+              borderRadius:10, padding:"7px 13px", fontSize:12, fontWeight:600, whiteSpace:"nowrap" }}>
+              {res[e.id]?"Reservert ✓":e.available>0?"Reserver":"Tomt"}
+            </button>
+          </div>
+        </Card>
+      ))}
+
+      {Object.values(res).some(Boolean) && (
+        <div style={{ marginTop:20 }}>
+          <Sec>Mine reservasjoner</Sec>
+          {equipment.filter(e=>res[e.id]).map(e=>(
+            <Card key={e.id} style={{ marginBottom:8, padding:13, background:C.tealSoft, border:`1px solid ${C.teal}33` }}>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <p style={{ fontSize:14, color:C.teal }}>{e.icon} {e.name}</p>
+                <span style={{ fontSize:11, color:C.teal, padding:"3px 10px", borderRadius:20, border:`1px solid ${C.teal}44` }}>Klar til henting</span>
+              </div>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── FEEDBACK ───────────────────────────────────────────────────────────────────
+function FeedbackScreen() {
+  const [cat, setCat] = useState("Tjenester");
+  const [type, setType] = useState("forbedring");
+  const [msg, setMsg] = useState("");
+  const [sent, setSent] = useState(false);
+
+  const send = () => {
+    if (!msg.trim()) return;
+    setSent(true);
+    setTimeout(()=>{ setSent(false); setMsg(""); }, 3000);
+  };
+
+  if (sent) return (
+    <div style={{ padding:"40px 16px", textAlign:"center" }}>
+      <div style={{ fontSize:60, marginBottom:16 }}>🙏</div>
+      <p style={{ fontSize:20, fontWeight:600, marginBottom:8 }}>Takk for tilbakemeldingen!</p>
+      <p style={{ fontSize:14, color:C.textSec }}>Vi behandler alle innspill kontinuerlig.</p>
+    </div>
+  );
+
+  return (
+    <div style={{ padding:"0 16px 16px" }}>
+      <p style={{ fontSize:20, fontWeight:600, marginBottom:6 }}>Tilbakemelding</p>
+      <p style={{ fontSize:13, color:C.textSec, marginBottom:20 }}>Hjelp oss å bli bedre</p>
+
+      <Sec>Kategori</Sec>
+      <div style={{ display:"flex", flexWrap:"wrap", gap:8, marginBottom:20 }}>
+        {["Tjenester","Teknisk","Fysisk miljø","Bøker"].map(c=><Tag key={c} label={c} active={cat===c} onClick={()=>setCat(c)} />)}
+      </div>
+
+      <Sec>Type tilbakemelding</Sec>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:8, marginBottom:20 }}>
+        {[
+          { id:"forbedring", label:"💡 Forbedring" },
+          { id:"feil",       label:"⚠️ Feil/problem" },
+          { id:"bok",        label:"📚 Foreslå bok" },
+          { id:"ros",        label:"⭐ Skryt" },
+        ].map(t=>(
+          <button key={t.id} onClick={()=>setType(t.id)} style={{
+            background:type===t.id?C.accentSoft:C.surface,
+            border:`1px solid ${type===t.id?C.accent:C.border}`,
+            borderRadius:12, padding:"11px 10px", fontSize:13, fontWeight:500,
+            color:type===t.id?C.accent:C.text, textAlign:"center" }}>{t.label}</button>
+        ))}
+      </div>
+
+      <Sec>Din melding</Sec>
+      <textarea value={msg} onChange={e=>setMsg(e.target.value)} rows={5}
+        placeholder={type==="bok"?"Tittel, forfatter, faglig relevans…":"Beskriv forslaget eller problemet…"}
+        style={{ width:"100%", background:C.surface, border:`1px solid ${C.border}`,
+          borderRadius:14, padding:"14px 16px", fontSize:14, color:C.text, resize:"none", marginBottom:20 }}/>
+
+      <button onClick={send} style={{ background:msg.trim()?C.accent:C.surface,
+        color:msg.trim()?"#fff":C.textMuted, border:`1px solid ${msg.trim()?"transparent":C.border}`,
+        borderRadius:14, padding:"15px", fontSize:16, fontWeight:600, width:"100%" }}>
+        Send tilbakemelding
+      </button>
+
+      <div style={{ height:24 }}/>
+      <Sec>Rask vurdering</Sec>
+      <Card>
+        <p style={{ fontSize:14, fontWeight:500, marginBottom:16 }}>Hvordan var opplevelsen din i dag?</p>
+        <div style={{ display:"flex", justifyContent:"space-around" }}>
+          {["😡","😕","😐","🙂","😍"].map((e,i)=>(
+            <button key={i} style={{ background:"none", fontSize:30, padding:6 }}>{e}</button>
+          ))}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ── SOCIAL FEED ────────────────────────────────────────────────────────────────
+function SocialScreen() {
+  const [votes, setVotes] = useState({});
+  const [exp, setExp] = useState(null);
+  const vote = (id,dir) => setVotes(v=>({...v,[`${id}-${dir}`]:!v[`${id}-${dir}`]}));
+
+  return (
+    <div style={{ padding:"0 16px 16px" }}>
+      <p style={{ fontSize:20, fontWeight:600, marginBottom:6 }}>Faglig feed</p>
+      <p style={{ fontSize:13, color:C.textSec, marginBottom:16 }}>Bokanbefalinger fra medstudenter</p>
+
+      <div style={{ display:"flex", gap:8, overflowX:"auto", paddingBottom:4, marginBottom:20 }}>
+        {["Alle","Anbefaling","Populær","Nytt"].map(f=><Tag key={f} label={f} active={f==="Alle"} onClick={()=>{}} />)}
+      </div>
+
+      {feedPosts.map(p=>(
+        <Card key={p.id} style={{ marginBottom:14 }}>
+          <div style={{ display:"flex", alignItems:"center", gap:10, marginBottom:12 }}>
+            <Av initials={p.avatar} />
+            <div style={{ flex:1 }}>
+              <p style={{ fontSize:13, fontWeight:500 }}>{p.user}</p>
+              <p style={{ fontSize:11, color:C.textMuted }}>{p.study} · {p.time}</p>
+            </div>
+            <span style={{ fontSize:11, fontWeight:600, padding:"3px 9px", borderRadius:20,
+              background:p.tag==="Populær"?C.amberSoft:C.accentSoft,
+              color:p.tag==="Populær"?C.amber:C.accent,
+              border:`1px solid ${p.tag==="Populær"?C.amber+"44":C.accent+"44"}` }}>{p.tag}</span>
+          </div>
+
+          <p style={{ fontSize:14, fontWeight:600, marginBottom:6 }}>{p.title}</p>
+          <p style={{ fontSize:13, color:C.textSec, lineHeight:1.5, marginBottom:14 }}>
+            {exp===p.id ? p.text : p.text.slice(0,80)+(p.text.length>80?"…":"")}
+            {p.text.length>80 && (
+              <button onClick={()=>setExp(exp===p.id?null:p.id)}
+                style={{ background:"none", color:C.accent, fontSize:13, marginLeft:4, padding:0 }}>
+                {exp===p.id?"Vis mindre":"Les mer"}
+              </button>
+            )}
+          </p>
+
+          <div style={{ display:"flex", gap:10, alignItems:"center" }}>
+            <button onClick={()=>vote(p.id,"up")} style={{
+              background:votes[`${p.id}-up`]?C.greenSoft:C.surface,
+              border:`1px solid ${votes[`${p.id}-up`]?C.green:C.border}`,
+              color:votes[`${p.id}-up`]?C.green:C.textSec,
+              borderRadius:10, padding:"6px 12px", fontSize:13, display:"flex", alignItems:"center", gap:5 }}>
+              👍 {p.likes+(votes[`${p.id}-up`]?1:0)}
+            </button>
+            <button onClick={()=>vote(p.id,"dn")} style={{
+              background:votes[`${p.id}-dn`]?C.redSoft:C.surface,
+              border:`1px solid ${votes[`${p.id}-dn`]?C.red:C.border}`,
+              color:votes[`${p.id}-dn`]?C.red:C.textSec,
+              borderRadius:10, padding:"6px 12px", fontSize:13, display:"flex", alignItems:"center", gap:5 }}>
+              👎 {p.dislikes}
+            </button>
+            <button style={{ background:"none", color:C.textMuted, fontSize:13, padding:"6px 4px", marginLeft:"auto" }}>
+              💬 {p.comments}
+            </button>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+// ── MAIN APP ───────────────────────────────────────────────────────────────────
+const mainTabs = [
+  { id:"home",    icon:"🏠", label:"Hjem" },
+  { id:"booking", icon:"📅", label:"Booking" },
+  { id:"map",     icon:"🗺️", label:"Kart" },
+  { id:"social",  icon:"📚", label:"Feed" },
+  { id:"more",    icon:"⋯",  label:"Mer" },
+];
+const moreTabs = [
+  { id:"access",    icon:"🔑", label:"Adgang" },
+  { id:"equipment", icon:"📦", label:"Utstyr" },
+  { id:"feedback",  icon:"💬", label:"Tilbakemelding" },
+];
+
+function App() {
+  const [loggedIn, setLoggedIn] = useState(false);
+  const [tab, setTab] = useState("home");
+
+  if (!loggedIn) return <LoginScreen onLogin={()=>setLoggedIn(true)} />;
+
+  const isMore = moreTabs.some(t=>t.id===tab);
+
+  return (
+    <div style={{ maxWidth:460, margin:"0 auto", minHeight:"100vh", display:"flex", flexDirection:"column", background:C.bg }}>
+
+      {/* Header */}
+      <div style={{ padding:"14px 16px 12px", display:"flex", alignItems:"center", justifyContent:"space-between",
+        borderBottom:`1px solid ${C.border}`, position:"sticky", top:0, background:C.bg, zIndex:10 }}>
+        <div style={{ display:"flex", alignItems:"center", gap:10 }}>
+          <span style={{ fontSize:20 }}>📚</span>
+          <span style={{ fontWeight:600, fontSize:15 }}>UB Bibliotek</span>
+        </div>
+        <div style={{ display:"flex", gap:8 }}>
+          <button style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:10, padding:"6px 10px", fontSize:14, color:C.textSec }}>🔔</button>
+          <button style={{ background:C.surface, border:`1px solid ${C.border}`, borderRadius:10, padding:"6px 10px", fontSize:14, color:C.textSec }}>🔍</button>
+        </div>
+      </div>
+
+      {/* Screen */}
+      <div style={{ flex:1, overflowY:"auto", paddingTop:20 }}>
+        {tab==="home"      && <HomeScreen setTab={setTab} />}
+        {tab==="booking"   && <BookingScreen />}
+        {tab==="map"       && <MapScreen />}
+        {tab==="social"    && <SocialScreen />}
+        {tab==="access"    && <AccessScreen />}
+        {tab==="equipment" && <EquipmentScreen />}
+        {tab==="feedback"  && <FeedbackScreen />}
+        {tab==="more" && (
+          <div style={{ padding:"0 16px" }}>
+            <p style={{ fontSize:20, fontWeight:600, marginBottom:20 }}>Mer</p>
+            {moreTabs.map(t=>(
+              <Card key={t.id} style={{ marginBottom:10 }} onClick={()=>setTab(t.id)}>
+                <div style={{ display:"flex", alignItems:"center", gap:14 }}>
+                  <span style={{ fontSize:22 }}>{t.icon}</span>
+                  <span style={{ fontSize:15, fontWeight:500 }}>{t.label}</span>
+                  <span style={{ marginLeft:"auto", color:C.textMuted, fontSize:18 }}>›</span>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+        <div style={{ height:80 }}/>
+      </div>
+
+      {/* Bottom nav */}
+      <div style={{ position:"sticky", bottom:0, background:C.surface,
+        borderTop:`1px solid ${C.border}`, display:"flex", padding:"10px 0 18px", zIndex:10 }}>
+        {mainTabs.map(t=>{
+          const active = tab===t.id || (t.id==="more" && isMore);
+          return (
+            <button key={t.id} onClick={()=>setTab(t.id)} style={{ flex:1, display:"flex",
+              flexDirection:"column", alignItems:"center", gap:3, background:"none", padding:"4px 0" }}>
+              <span style={{ fontSize:20 }}>{t.icon}</span>
+              <span style={{ fontSize:10, color:active?C.accent:C.textMuted, fontWeight:active?600:400 }}>{t.label}</span>
+              {active && <div style={{ width:4, height:4, borderRadius:"50%", background:C.accent }}/>}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+</script>
+</body>
+</html>
